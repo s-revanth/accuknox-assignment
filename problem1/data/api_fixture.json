@@ -1,0 +1,20 @@
+{
+  "books": [
+    {"title": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "publication_year": 2017},
+    {"title": "The C Programming Language", "author": "Brian Kernighan", "publication_year": 1978},
+    {"title": "Operating Systems: Three Easy Pieces", "author": "Remzi Arpaci-Dusseau", "publication_year": 2018},
+    {"title": "Structure and Interpretation of Computer Programs", "author": "Harold Abelson", "publication_year": 1985},
+    {"title": "Database Internals", "author": "Alex Petrov", "publication_year": 2019},
+    {"title": "Designing Data-Intensive Applications", "author": "Martin Kleppmann", "publication_year": 2017},
+    {"title": "A Book With No Year", "author": "Anonymous"}
+  ],
+  "students": [
+    {"id": 1, "name": "Asha",   "scores": {"math": 92, "physics": 85, "chemistry": 78}},
+    {"id": 2, "name": "Bilal",  "scores": {"math": 67, "physics": 72, "chemistry": 70}},
+    {"id": 3, "name": "Chen",   "scores": {"math": 88, "physics": 94, "chemistry": 91}},
+    {"id": 4, "name": "Divya",  "scores": {"math": 55, "physics": 61, "chemistry": 58}},
+    {"id": 5, "name": "Emeka",  "scores": {"math": 79, "physics": 83, "chemistry": 88}},
+    {"id": 6, "name": "Farah",  "scores": {"math": 95, "physics": 90, "chemistry": null}},
+    {"id": 7, "name": "Gopal",  "scores": {"math": 73, "physics": 68, "chemistry": 81}}
+  ]
+}

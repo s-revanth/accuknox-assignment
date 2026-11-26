@@ -1,0 +1,62 @@
+
+## Build: 8000 vectors, d=64, M=16, ef_construction=100: 14.8s (541 inserts/s, pure Python)
+
+## 1. Unfiltered search: recall vs cost (200 queries, k=10)
+
+       method  recall@10  dist evals/query  ms/query
+-------------  ---------  ----------------  --------
+exact (numpy)      1.000              8000      0.46
+   HNSW ef=10      0.662               340      0.15
+   HNSW ef=16      0.759               441      0.20
+   HNSW ef=32      0.890               694      0.32
+   HNSW ef=64      0.963              1141      0.57
+  HNSW ef=128      0.994              1940      1.00
+  HNSW ef=256      1.000              3171      1.81
+
+Note: numpy brute force is one BLAS call, HNSW is a Python loop, so HNSW only wins on *distance
+computations* here. In a compiled engine at millions of vectors that becomes the wall-clock win.
+
+## 2. Filtered search: tenant = X (k=10, ef=64)
+
+               tenant           strategy  recall@10  dist evals/query  queries w/ 0 hits
+---------------------  -----------------  ---------  ----------------  -----------------
+big (3185 pts, 40.0%)               post      0.931              1141                  0
+big (3185 pts, 40.0%)               hnsw      0.993              2277                  0
+big (3185 pts, 40.0%)              exact      1.000              3185                  0
+big (3185 pts, 40.0%)   auto -> 200 hnsw      0.993              2277                  0
+ mid (824 pts, 10.0%)               post      0.636              1141                  0
+ mid (824 pts, 10.0%)               hnsw      1.000              5261                  0
+ mid (824 pts, 10.0%)              exact      1.000               824                  0
+ mid (824 pts, 10.0%)  auto -> 200 exact      1.000               824                  0
+ small (86 pts, 1.0%)               post      0.052              1141                117
+ small (86 pts, 1.0%)               hnsw      1.000              8054                  0
+ small (86 pts, 1.0%)              exact      1.000                86                  0
+ small (86 pts, 1.0%)  auto -> 200 exact      1.000                86                  0
+  tiny (14 pts, 0.1%)               post      0.011              1141                178
+  tiny (14 pts, 0.1%)               hnsw      1.000              8055                  0
+  tiny (14 pts, 0.1%)              exact      1.000                14                  0
+  tiny (14 pts, 0.1%)  auto -> 200 exact      1.000                14                  0
+
+post-filter starves small tenants; filtered HNSW gets expensive as selectivity drops;
+exact via the payload index is perfect and cheap when few points match. `auto` picks per query.
+
+## 3. int8 scalar quantization (brute force over all vectors)
+
+            vectors as   memory  recall@10
+----------------------  -------  ---------
+               float32  2.05 MB      1.000
+          int8, top-10  0.51 MB      0.970
+int8, top-20 + rescore  0.51 MB      1.000
+int8, top-40 + rescore  0.51 MB      1.000
+
+## 4. Durability
+
+                                            operation        time
+-----------------------------------------------------  ----------
+                                    upsert, fsync=off  1.17 ms/op
+                                     upsert, fsync=on  6.69 ms/op
+recover: replay 8000 WAL records (rebuilds the graph)     14.59 s
+            recover: load snapshot seq=8000, replay 0      0.03 s
+
+fsync per write is the price of 'acknowledged = durable'. Snapshots turn recovery from
+'rebuild the whole index' into 'load a file'. Batching fsyncs (group commit) is the usual fix for the former.

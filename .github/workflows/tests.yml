@@ -1,0 +1,35 @@
+name: tests
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r requirements.txt
+      - name: Problem 1 tests
+        working-directory: problem1
+        run: python -m unittest test_problem1 -v
+      - name: Q4 tinyvec tests
+        working-directory: q4_tinyvec
+        run: python -m unittest test_tinyvec -v
+      - name: Q5 forensics tests
+        working-directory: q5_forensics
+        run: python -m unittest test_forensics -v
+      - name: Q4 + Q5 demos run end to end
+        shell: bash
+        run: |
+          (cd q4_tinyvec && python demo.py | tail -5)
+          (cd q5_forensics && python simulate.py | head -12)

@@ -1,0 +1,4 @@
+# Python 3.10+. Everything else is the standard library (sqlite3, http.server, csv, multiprocessing).
+requests>=2.28    # Problem 1, Q1/Q2: HTTP client with timeouts
+matplotlib>=3.6   # Problem 1, Q2: bar chart
+numpy>=1.24       # Q4 tinyvec: batched distance computations

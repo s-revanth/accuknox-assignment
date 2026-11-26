@@ -1,0 +1,52 @@
+indexed 3000 alerts in 5.5s
+
+> acme: 'someone opened a shell in the payments container'
+  plan: exact scan over 900 candidate(s) from payload index; est. cost exact=900, hnsw=3000  |  distance computations: 900
+  0.424  [acme/critical/prod-us]  shell /bin/sh spawned inside container payments-api-24d86 by node, possible container es
+  0.416  [acme/critical/prod-eu]  shell /bin/dash spawned inside container payments-api-c6bbf by node, possible container 
+  0.411  [acme/critical/staging]  shell /bin/sh spawned inside container payments-api-8bc08 by node, possible container es
+  0.411  [acme/critical/staging]  shell /bin/sh spawned inside container payments-api-1b6bc by node, possible container es
+  0.405  [acme/critical/prod-eu]  shell /bin/bash spawned inside container payments-api-76f42 by php-fpm, possible contain
+
+> tinycorp (20 alerts) — same question
+  plan: exact scan over 20 candidate(s) from payload index; est. cost exact=20, hnsw=3000  |  distance computations: 20
+  0.306  [tinycorp/medium/staging]  mount syscall blocked for wget in privileged container payments-api-5873d (ns prod, pid 
+  0.285  [tinycorp/critical/prod-us]  shell /bin/bash spawned inside container ledger-7560b by java, possible container escape
+  0.251  [tinycorp/medium/staging]  write to sensitive file /etc/shadow in container payments-api-1c271 (ns default, pid 543
+  0.204  [tinycorp/high/staging]  crypto miner minerd started in pod payments-api-bb0f6 with high cpu usage (ns web, pid 6
+  0.194  [tinycorp/medium/staging]  mount syscall blocked for python3 in privileged container checkout-c8358 (ns prod, pid 1
+
+> tinycorp with naive post-filtering (watch it come back short or empty)
+  plan: post-filter: ANN top-64 then filter  |  distance computations: 325
+
+> globex, high+critical, prod-eu: 'pod talking to a suspicious external server'
+  plan: exact scan over 121 candidate(s) from payload index; est. cost exact=121, hnsw=3000  |  distance computations: 121
+  0.197  [globex/high/prod-eu]  outbound connection from reports-29e84 to unknown external IP 103.21.244.0 on port 4444 
+  0.195  [globex/high/prod-eu]  outbound connection from reports-da1d5 to unknown external IP 103.21.244.0 on port 3333 
+  0.194  [globex/high/prod-eu]  outbound connection from payments-api-cf31a to unknown external IP 45.33.12.9 on port 84
+  0.185  [globex/high/prod-eu]  unexpected binary python3 executed in pod auth-svc-697ed from writable path /tmp (ns pro
+  0.185  [globex/high/prod-eu]  outbound connection from ledger-2c5a0 to unknown external IP 45.33.12.9 on port 6667 (ns
+
+recovered after 'crash': {'snapshot_seq': 3000, 'replayed': 1, 'torn_bytes_cut': 0}, 3001 alerts
+
+> acme: 'reverse shell', HNSW ef=64
+  plan: filtered HNSW (ef=64, 30.0% match)  |  distance computations: 707
+  0.201  [acme/critical/prod-us]  shell /bin/sh spawned inside container checkout-129b9 by python3, possible container esc
+  0.200  [acme/critical/staging]  shell /bin/sh spawned inside container checkout-6fc6a by node, possible container escape
+  0.192  [acme/critical/prod-eu]  shell /bin/dash spawned inside container auth-svc-baa6b by python3, possible container e
+
+> acme: 'reverse shell', HNSW ef=256
+  plan: filtered HNSW (ef=256, 30.0% match)  |  distance computations: 1812
+  0.411  [acme/critical/prod-us]  reverse shell nc connected back to 185.220.101.4:4444 from checkout
+  0.201  [acme/critical/prod-us]  shell /bin/sh spawned inside container checkout-129b9 by python3, possible container esc
+  0.200  [acme/critical/staging]  shell /bin/sh spawned inside container checkout-6fc6a by node, possible container escape
+
+> acme: 'reverse shell', exact (ground truth)
+  plan: exact scan over 901 candidate(s) from payload index  |  distance computations: 901
+  0.411  [acme/critical/prod-us]  reverse shell nc connected back to 185.220.101.4:4444 from checkout
+  0.201  [acme/critical/prod-us]  shell /bin/sh spawned inside container checkout-129b9 by python3, possible container esc
+  0.200  [acme/critical/staging]  shell /bin/sh spawned inside container checkout-6fc6a by node, possible container escape
+
+The newest alert (replayed from the WAL) is an outlier: unlike anything else in the graph.
+At ef=64 the beam search never reaches it; at ef=256 it does. 'Approximate' is a real trade-off,
+which is why you measure recall (bench.py) and pair vectors with keyword search in production.
